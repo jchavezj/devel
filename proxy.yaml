@@ -1,0 +1,31 @@
+---
+- name: Check kernel version and IP address
+  hosts: all
+  gather_facts: yes
+  vars:
+    required_kernel: "kernel-5.14.0-427.el9"
+    required_ip: "172.25.2.1"
+  tasks:
+    - name: Get installed kernel version
+      ansible.builtin.shell: uname -r
+      register: kernel_version
+      changed_when: false
+
+    - name: Get IP address of eth_link0
+      ansible.builtin.command: ip addr show eth_link0
+      register: ip_addr_output
+      changed_when: false
+
+    - name: Parse IP address from command output
+      set_fact:
+        installed_ip: "{{ (ip_addr_output.stdout | regex_search('inet (\\d+\\.\\d+\\.\\d+\\.\\d+)/', '\\1')) }}"
+
+    - name: Compare kernel and IP and display results
+      ansible.builtin.debug:
+        msg: |
+          | Status  | Required           | Installed           |
+          |---------|--------------------|---------------------|
+          | Kernel  | {{ required_kernel }} | kernel-{{ kernel_version.stdout }} |
+          | IP      | {{ required_ip }}    | {{ installed_ip }}   |
+          | Result  | {% if (\"kernel-\" + kernel_version.stdout == required_kernel) and (installed_ip == required_ip) %}Succeed{% else %}Failed{% endif %}           |
+
