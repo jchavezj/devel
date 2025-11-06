@@ -1,0 +1,42 @@
+---
+- name: Compare Kernel and eth0 IP against required values
+  hosts: all
+  gather_facts: yes
+  become: yes
+
+  vars:
+    required_kernel: "437"
+    required_ip: "1.2.3.4"
+
+  tasks:
+    - name: Extract current kernel version (last segment of uname output)
+      set_fact:
+        current_kernel_short: "{{ ansible_kernel.split('.')[-1] }}"
+
+    - name: Extract eth0 IP (fallback to NONE if missing)
+      set_fact:
+        current_eth0_ip: "{{ ansible_facts.get('ansible_eth0', {}).get('ipv4', {}).get('address', 'NONE') }}"
+
+    - name: Determine kernel match status
+      set_fact:
+        kernel_match: "{{ 'MATCH' if current_kernel_short == required_kernel else 'NO MATCH' }}"
+
+    - name: Determine IP match status
+      set_fact:
+        ip_match: "{{ 'MATCH' if current_eth0_ip == required_ip else 'NO MATCH' }}"
+
+    - name: Display results in a neat table
+      debug:
+        msg: |
+          +------------------+-------------------+
+          | Host             | {{ inventory_hostname }}
+          +------------------+-------------------+
+          | Required Kernel  | {{ required_kernel }}
+          | Current Kernel   | {{ current_kernel_short }}
+          | Kernel Status    | {{ kernel_match }}
+          +------------------+-------------------+
+          | Required IP      | {{ required_ip }}
+          | Current IP       | {{ current_eth0_ip }}
+          | IP Status        | {{ ip_match }}
+          +------------------+-------------------+
+
