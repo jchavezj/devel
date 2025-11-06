@@ -1,0 +1,45 @@
+---
+- name: Compare kernel and IP with required values
+  hosts: all
+  gather_facts: yes
+  vars:
+    required_kernel: "4.27"
+    required_ip: "1.2.3.4"
+
+  tasks:
+    - name: Build comparison row per host
+      set_fact:
+        row: >-
+          {{
+            [
+              inventory_hostname,
+              ansible_facts['kernel'],
+              required_kernel,
+              ansible_facts['default_ipv4']['address'] | default('N/A'),
+              required_ip
+            ]
+          }}
+      when: ansible_facts['default_ipv4'] is defined
+
+    - name: Aggregate all rows
+      set_fact:
+        table_rows: "{{ (table_rows | default([])) + [row] }}"
+      run_once: yes
+      delegate_to: localhost
+      when: row is defined
+
+    - name: Display comparison table
+      debug:
+        msg: >
+          {{ table_rows | ansible.utils.to_tabulate(
+               headers=[
+                 'Host',
+                 'Current Kernel',
+                 'Required: 4.27',
+                 'Current IP',
+                 'Required: 1.2.3.4'
+               ],
+               tablefmt='psql') }}
+      run_once: yes
+      delegate_to: localhost
+      when: table_rows is defined
