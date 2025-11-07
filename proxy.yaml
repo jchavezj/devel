@@ -1,31 +1,47 @@
 ---
-- name: Check kernel version and IP address
+- name: Compare Kernel and eth0 IP against required values
   hosts: all
   gather_facts: yes
+  become: yes
+
   vars:
-    required_kernel: "kernel-5.14.0-427.el9"
-    required_ip: "172.25.2.1"
+    required_kernel: "437"
+    required_ip: "1.2.3.4"
+
   tasks:
-    - name: Get installed kernel version
-      ansible.builtin.shell: uname -r
-      register: kernel_version
-      changed_when: false
+    - name: Extract current kernel version (last segment of uname output)
+      # set_fact:
+        # current_kernel_short: "{{ ansible_kernel('.')[-1] }}"
+          #current_kernel_short: "{{ ansible_kernel.split('.')[-1] }}"
+      debug:
+        var: ansible_kernel
+          #ansible.builtin.shell: uname -r
+          #register: kernel_version
+          #changed_when: false
 
-    - name: Get IP address of eth_link0
-      ansible.builtin.command: ip addr show eth_link0
-      register: ip_addr_output
-      changed_when: false
-
-    - name: Parse IP address from command output
+    - name: Extract eth0 IP (fallback to NONE if missing)
       set_fact:
-        installed_ip: "{{ (ip_addr_output.stdout | regex_search('inet (\\d+\\.\\d+\\.\\d+\\.\\d+)/', '\\1')) }}"
+        current_eth0_ip: "{{ ansible_facts.get('ens192', {}).get('ipv4', {}).get('address', 'NONE') }}"
 
-    - name: Compare kernel and IP and display results
-      ansible.builtin.debug:
-        msg: |
-          | Status  | Required           | Installed           |
-          |---------|--------------------|---------------------|
-          | Kernel  | {{ required_kernel }} | kernel-{{ kernel_version.stdout }} |
-          | IP      | {{ required_ip }}    | {{ installed_ip }}   |
-          | Result  | {% if (\"kernel-\" + kernel_version.stdout == required_kernel) and (installed_ip == required_ip) %}Succeed{% else %}Failed{% endif %}           |
+    - name: Determine kernel match status
+      set_fact:
+        kernel_match: "{{ 'SUCCESS' if ansible_kernel == required_kernel else 'FAILED' }}"
 
+    - name: Determine IP match status
+      set_fact:
+        ip_match: "{{ 'SUCCESS' if current_eth0_ip == required_ip else 'FAILED' }}"
+
+    - name: Display results in a neat table
+      debug:
+            msg: |
+             +------------------+-------------------+
+             | Host             | {{ inventory_hostname }} |
+             +------------------+-------------------+
+             | Required Kernel  | {{ required_kernel }} |
+             | Current Kernel   | {{ ansible_kernel }} |
+             | Kernel Status    | {{ kernel_match }} |
+             +------------------+-------------------+
+             | Required IP      | {{ required_ip }} |
+             | Current IP       | {{ current_eth0_ip }} |
+             | IP Status        | {{ ip_match }} |
+             +------------------+-------------------+
