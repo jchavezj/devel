@@ -1,0 +1,34 @@
+---
+- name: Log Error Audit - RHEL/Rocky/Alma
+  hosts: all
+  gather_facts: no
+
+  vars:
+    # Adjust how far back to check
+    lookback: "2 hours ago"
+
+    # Patterns to scan for in log messages
+    error_patterns: "(error|critical|failed|panic|segfault|oom|warn)"
+
+  tasks:
+
+    - name: Check system journal for errors
+      command: journalctl -p 0..3 --since "{{ lookback }}"
+      register: journallog
+      failed_when: false
+
+    - name: Scan /var/log/messages for errors
+      shell: grep -Ei "{{ error_patterns }}" /var/log/messages | tail -n 50
+      register: syslog_scan
+      failed_when: false
+
+    - name: Display summary
+      debug:
+        msg:
+          - "---- LOG SUMMARY ----"
+          - "Journal errors (last {{ lookback }}):"
+          - "{{ journallog.stdout_lines | default(['None found']) }}"
+          - ""
+          - "/var/log/messages matches:"
+          - "{{ syslog_scan.stdout_lines | default(['None found']) }}"
+
